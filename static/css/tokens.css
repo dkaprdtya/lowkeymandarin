@@ -1,0 +1,103 @@
+/* Lowkey Mandarin — design tokens
+   Editorial brutalism: ink on warm paper, one vermilion signal, one lime pulse. */
+
+:root {
+  /* ---- colour ---- */
+  --ink: #151515;
+  --ink-rgb: 21, 21, 21;
+  --graphite: #303030;
+  --ivory: #f0ede5;
+  --paper: #f7f4ec;
+  --paper-deep: #e7e2d6;
+  --vermilion: #ed6048;
+  --vermilion-deep: #c9452f;
+  --vermilion-text: #a8391f;
+  --lime: #dceb72;
+  --lime-deep: #c3d54e;
+  --grey: #6b6860;
+  --grey-soft: #c9c5ba;
+  --line: rgba(var(--ink-rgb), 0.16);
+  --line-soft: rgba(var(--ink-rgb), 0.08);
+  --line-strong: rgba(var(--ink-rgb), 0.44);
+  --ink-90: rgba(var(--ink-rgb), 0.9);
+  --ink-70: rgba(var(--ink-rgb), 0.7);
+  --ink-50: rgba(var(--ink-rgb), 0.64);
+  --ivory-70: rgba(240, 237, 229, 0.7);
+  --ivory-55: rgba(240, 237, 229, 0.55);
+  --ivory-20: rgba(240, 237, 229, 0.2);
+  --ivory-10: rgba(240, 237, 229, 0.1);
+
+  /* relation colours, shared by graph + legends */
+  --rel-synonym: #dceb72;
+  --rel-antonym: #ed6048;
+  --rel-time: #f2b544;
+  --rel-semantic: #8fb4d9;
+  --rel-collocation: #c8a2e0;
+  --rel-sentence: #8fd3b6;
+  --rel-component: #96938a;
+
+  /* ---- type ---- */
+  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-cn: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-cn-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
+
+  --step--1: 0.75rem;
+  --step-0: 0.9375rem;
+  --step-1: clamp(1.0625rem, 0.95rem + 0.35vw, 1.25rem);
+  --step-2: clamp(1.25rem, 1.05rem + 0.7vw, 1.625rem);
+  --step-3: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+  --step-4: clamp(2rem, 1.4rem + 2.4vw, 3.5rem);
+  --step-5: clamp(2.75rem, 1.6rem + 4.6vw, 5.75rem);
+  --step-6: clamp(3.75rem, 1.5rem + 9vw, 10rem);
+  --step-giant: clamp(5rem, 10vw + 2rem, 15rem);
+
+  --tracking-tight: -0.035em;
+  --tracking-wide: 0.16em;
+  --leading-tight: 0.94;
+  --leading-body: 1.55;
+
+  /* ---- space ---- */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+  --s-9: 6rem;
+  --s-10: 8rem;
+
+  /* ---- structure ---- */
+  --rail-w: 104px;
+  --rail-w-open: 272px;
+  --topbar-h: 62px;
+  --mobilenav-h: 66px;
+  --page-pad: clamp(1.25rem, 3.4vw, 4rem);
+  --maxw: 1680px;
+  --radius: 2px;
+  --radius-lg: 4px;
+  --radius-pill: 999px;
+
+  /* ---- motion ---- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 140ms;
+  --dur-2: 260ms;
+  --dur-3: 480ms;
+  --dur-4: 800ms;
+
+  --z-rail: 40;
+  --z-topbar: 30;
+  --z-overlay: 80;
+  --z-toast: 100;
+}
+
+@media (max-width: 960px) {
+  :root {
+    --rail-w: 0px;
+    --topbar-h: 54px;
+  }
+}

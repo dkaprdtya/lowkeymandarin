@@ -1,0 +1,30 @@
+# Lowkey Mandarin systemd unit for a Linux VPS without Docker.
+# Adjust paths, create the service user, and keep the environment file private.
+#
+#   sudo useradd --system --home /opt/hanzi-flow --shell /usr/sbin/nologin hanzi
+#   sudo install -d -o hanzi -g hanzi /var/lib/hanzi-flow
+#   sudo install -m 600 deploy/hanzi-flow.env.example /etc/hanzi-flow.env
+
+[Unit]
+Description=Lowkey Mandarin
+After=network.target
+
+[Service]
+Type=simple
+User=hanzi
+Group=hanzi
+WorkingDirectory=/opt/hanzi-flow
+EnvironmentFile=/etc/hanzi-flow.env
+Environment=HANZI_DB=/var/lib/hanzi-flow/hanzi.db
+ExecStart=/opt/hanzi-flow/.venv/bin/waitress-serve --listen=127.0.0.1:8000 --threads=4 --no-clear-untrusted-proxy-headers wsgi:app
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hanzi-flow
+
+[Install]
+WantedBy=multi-user.target

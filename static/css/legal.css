@@ -1,0 +1,206 @@
+/* Lowkey Mandarin — guide, legal pages and data controls */
+
+/* ---------------- legal / prose ---------------- */
+.legal__body {
+  max-width: 74ch;
+  padding-top: clamp(1.5rem, 3vw, 2.5rem);
+}
+.legal__section {
+  padding: 0 0 1.6rem;
+  margin-bottom: 1.6rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+.legal__section:last-child { border-bottom: 0; margin-bottom: 0; }
+.legal__section h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.7rem;
+}
+.legal__section p {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--ink-70);
+  max-width: 68ch;
+}
+.legal__section p + p { margin-top: 0.7rem; }
+.legal__section code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.legal__section a { color: var(--ink); border-bottom: 1px solid var(--vermilion); }
+.legal__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+/* ---------------- data controls ---------------- */
+.data__panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(1.5rem, 3vw, 2.25rem);
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.data__action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--paper);
+  padding: clamp(1.1rem, 2.4vw, 1.6rem);
+}
+.data__action > div { flex: 1; }
+.data__action h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  margin-bottom: 0.4rem;
+}
+.data__action p { font-size: 0.8125rem; line-height: 1.55; color: var(--ink-70); max-width: 40ch; }
+
+/* ---------------- help ---------------- */
+.help__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(1.5rem, 3vw, 2.5rem);
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.help__step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--ivory);
+  padding: clamp(1rem, 2.2vw, 1.5rem);
+}
+.help__step-num { font-family: var(--font-mono); font-size: 0.5625rem; letter-spacing: 0.14em; color: var(--vermilion-text); }
+.help__step h2 { font-family: var(--font-display); font-size: 1.3rem; line-height: 1.05; }
+.help__step p { font-size: 0.8125rem; line-height: 1.55; color: var(--ink-70); flex: 1; }
+.help__step a { font-size: 0.5625rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-50); align-self: flex-start; }
+.help__step a:hover { color: var(--vermilion-text); }
+
+.help__section {
+  padding: clamp(2rem, 4vw, 3.25rem) 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+.help__h2 {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 0.4rem 0 0.7rem;
+}
+.help__text { font-size: 0.875rem; line-height: 1.6; color: var(--ink-70); max-width: 40ch; }
+
+.help__rooms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.5rem;
+  border-top: 1px solid var(--line-strong);
+}
+.help__room {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.help__room-glyph {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  font-family: var(--font-cn);
+  font-size: 1.15rem;
+  transition: all var(--dur-2);
+}
+.help__room-body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.help__room-body b { font-family: var(--font-display); font-size: 1.1rem; font-weight: 400; line-height: 1.1; }
+.help__room-body span { font-size: 0.75rem; line-height: 1.45; color: var(--ink-50); }
+.help__room > .arrow { color: var(--ink-50); transition: transform var(--dur-2); }
+.help__room:hover .help__room-glyph { background: var(--ink); border-color: var(--ink); color: var(--ivory); }
+.help__room:hover > .arrow { transform: translateX(4px); color: var(--vermilion-text); }
+
+.help__split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.4fr) minmax(0, 0.6fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+}
+.help__keys { border-top: 1px solid var(--line-strong); }
+.help__keys > div {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.help__keys dt kbd { font-size: 0.625rem; }
+.help__keys dd { font-size: 0.8125rem; color: var(--ink-70); }
+
+.help__note {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: clamp(1.2rem, 2.5vw, 1.8rem);
+}
+.help__note p { font-size: 0.875rem; line-height: 1.6; color: var(--ink-70); max-width: 62ch; }
+.help__note p + p { margin-top: 0.9rem; }
+
+/* ---------------- FAQ ---------------- */
+.faq { border-top: 1px solid var(--line-strong); }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary {
+  position: relative;
+  padding: 0.95rem 2rem 0.95rem 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  line-height: 1.2;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+";
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--ink-50);
+  transition: transform var(--dur-2);
+}
+.faq details[open] summary::after { content: "−"; }
+.faq p {
+  padding: 0 3rem 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-70);
+  max-width: 60ch;
+}
+
+@media (max-width: 860px) {
+  .data__panel { grid-template-columns: 1fr; }
+  .help__steps { grid-template-columns: 1fr; }
+  .help__rooms { grid-template-columns: 1fr; }
+  .help__split { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .help__keys > div { grid-template-columns: 9rem minmax(0, 1fr); }
+  .data__action .btn { width: 100%; }
+}

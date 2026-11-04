@@ -1,0 +1,27 @@
+# Lowkey Mandarin reverse-proxy example for Caddy 2.
+# Replace hanzi.example.com, then run: caddy validate --config Caddyfile
+#
+# Caddy obtains and renews TLS certificates automatically. The app listens on
+# loopback only; HANZI_TRUST_PROXY=1 tells it to trust Caddy's forwarded headers.
+# Caddy sets X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host itself.
+
+hanzi.example.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	@static path /static/*
+	header @static Cache-Control "public, max-age=3600"
+
+	reverse_proxy 127.0.0.1:8000 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output file /var/log/caddy/hanzi-flow.log
+		format json
+	}
+}

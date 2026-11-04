@@ -1,0 +1,26 @@
+services:
+  hanzi-flow:
+    build: .
+    image: hanzi-flow:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HANZI_DB: /data/hanzi.db
+      HANZI_TRUST_PROXY: "1"
+    ports:
+      # Keep the app on loopback and put Nginx or Caddy in front for HTTPS.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - hanzi-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  hanzi-data:

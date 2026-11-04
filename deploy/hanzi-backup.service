@@ -1,0 +1,16 @@
+[Unit]
+Description=Lowkey Mandarin SQLite backup
+Documentation=file:/opt/hanzi-flow/README.md
+After=hanzi-flow.service
+
+[Service]
+Type=oneshot
+User=hanzi
+Group=hanzi
+WorkingDirectory=/opt/hanzi-flow
+ExecStart=/opt/hanzi-flow/.venv/bin/python /opt/hanzi-flow/backup.py --db /var/lib/hanzi-flow/hanzi.db --out /var/lib/hanzi-flow/backups --keep 14
+ReadWritePaths=/var/lib/hanzi-flow
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
