@@ -1,5 +1,7 @@
 // Lowkey Mandarin — hash router
 
+import { esc } from "./ui.js";
+
 const routes = [];
 let activeCleanup = null;
 let activePage = null;
@@ -75,7 +77,7 @@ export async function resolve() {
       <section class="page">
         <p class="eyebrow eyebrow--accent">Connection interrupted</p>
         <h1 class="page-head__title" style="margin:.6rem 0 1rem">This room did not load.</h1>
-        <p class="lede">${error.message}</p>
+        <p class="lede">${esc(error.message)}</p>
         <p style="margin-top:1.5rem"><button class="btn" id="routeRecovery" type="button">Return to origin <span class="arrow">→</span></button></p>
       </section>`;
     view.querySelector("#routeRecovery")?.addEventListener("click", () => navigate("/"));
