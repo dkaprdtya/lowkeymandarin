@@ -1,12 +1,10 @@
-"""Vercel entry point.
+"""Legacy Vercel function entry point.
 
-Vercel imports ``app`` from this module as the WSGI application. Everything
-else (templates, static files, the API) is handled by the Flask app itself.
-
-Storage is PostgreSQL on serverless: ``DATABASE_URL`` must be set in the
-project environment, because the deployment filesystem is read-only and
-per-instance. ``database.py`` refuses to write accounts to ephemeral storage
-unless ``HANZI_ALLOW_EPHEMERAL=1`` is set for a throwaway demo.
+Vercel's Flask preset uses ``app.py`` at the repository root, which is the
+supported configuration in ``vercel.json``. This module stays for projects that
+were created before the preset existed: importing it still exposes a WSGI
+``app``. Do not add a catch-all rewrite to it; that makes the function receive
+the rewritten path instead of the visitor's path.
 """
 from __future__ import annotations
 

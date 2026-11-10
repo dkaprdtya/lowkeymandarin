@@ -193,15 +193,19 @@ and seeds its schema on the first request.
 
 1. Create a PostgreSQL database (Neon, Supabase, RDS). Copy the pooled
    connection string that ends with `?sslmode=require`.
-2. In the Vercel project, add environment variables for Production and Preview:
+2. Import the repository with the Vercel **Flask** framework preset. Vercel uses
+   `app.py` as the entry point and serves every path through it, including
+   `static/` and `templates/`. Do not add a catch-all rewrite to `api/index`;
+   that sends the rewritten path to Flask and every route answers 404.
+3. In the Vercel project, add environment variables for Production and Preview:
    - `DATABASE_URL` - the connection string
    - `HANZI_COOKIE_SECURE=1`
    - `HANZI_PUBLIC_URL=https://your-domain`
    - `HANZI_TRUSTED_HOSTS=your-domain` (optional; the public URL host is added
      automatically)
-3. Redeploy. `VERCEL=1` is set by the platform, so forwarded headers and
+4. Redeploy. `VERCEL=1` is set by the platform, so forwarded headers and
    HTTPS-only cookies are handled without extra configuration.
-4. Check `https://your-domain/api/health`. It must return
+5. Check `https://your-domain/api/health`. It must return
    `{"ok": true, "words": 2594}`.
 
 Never commit the connection string. Rotate the database password if it has been
