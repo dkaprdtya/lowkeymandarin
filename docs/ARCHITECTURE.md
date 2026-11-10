@@ -15,19 +15,24 @@ Flask app factory
   auth.py                      accounts, sessions, reset, deletion
   security.py                  headers, body limit, rate limiter, host check
   webfront.py                  site info, robots, sitemap, errors, redirects
-  database.py                  SQLite connection and schema migration
+  database.py                  SQLite/PostgreSQL connection and schema migration
   seed.py                      vocabulary, relations, scenes, sound, characters
         |
         v
-SQLite
-  instance/hanzi.db            local default
-  /data/hanzi.db               Docker volume
-  HANZI_DB                     overrides the path
+Storage
+  SQLite
+    instance/hanzi.db          local default
+    /data/hanzi.db             Docker volume
+    HANZI_DB                   overrides the path
+  PostgreSQL
+    DATABASE_URL                used instead of SQLite when set (required on
+                                serverless hosts such as Vercel)
 ```
 
-`wsgi.py` imports the Flask app and optionally wraps it with `ProxyFix`. Only set
-`HANZI_TRUST_PROXY=1` when a trusted reverse proxy overwrites the forwarded
-headers and the app is bound to loopback.
+`wsgi.py` imports the Flask app. `app.py` applies `ProxyFix` when
+`HANZI_TRUST_PROXY=1` or when the platform sets `VERCEL=1`. Only trust
+forwarded headers when a proxy overwrites them, and keep a directly exposed
+app on `HANZI_TRUST_PROXY=0`.
 
 ## Frontend
 
@@ -84,8 +89,11 @@ session rotation and password reset. Password reset needs both SMTP and an HTTPS
 
 ## Database
 
-`schema.sql` is the source of truth. `database.prepare_schema()` applies it with
-`CREATE TABLE IF NOT EXISTS` and removes the obsolete single-profile table.
+`schema.sql` is the source of truth for SQLite and `schema_postgres.sql` for
+PostgreSQL. Both are applied with `CREATE TABLE IF NOT EXISTS` by
+`database.prepare_schema()`, which also removes the obsolete single-profile
+table. `app_meta` stores the content version, so an already seeded database
+skips the per-row sync on later starts.
 
 | Table | Owner | Purpose |
 | --- | --- | --- |
@@ -161,6 +169,8 @@ All write endpoints expect `Content-Type: application/json` and the
 
 ## Deliberate limits
 
-One process and one SQLite file. The rate limiter is in memory. There is no email
-verification, background job queue, password pepper or WAF. Treat those as real
-constraints, not missing polish hidden behind claims.
+One process and one database. The rate limiter is in memory, so API limits are
+per instance on a serverless host. There is no email verification, background
+job queue, password pepper or WAF. Treat those as real constraints, not missing
+polish hidden behind claims. A multi-instance deployment should move rate
+limiting to the platform firewall or Redis.

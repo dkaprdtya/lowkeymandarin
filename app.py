@@ -25,6 +25,7 @@ try:
     )
     from database import (
         DatabaseNotConfigured,
+        bundled_word_count,
         close_db,
         content_version,
         database_ready,
@@ -52,6 +53,7 @@ except ImportError:  # pragma: no cover - package import
     )
     from .database import (
         DatabaseNotConfigured,
+        bundled_word_count,
         close_db,
         content_version,
         database_ready,
@@ -161,7 +163,7 @@ def init_db() -> int:
             "No durable database configured. Set DATABASE_URL to a PostgreSQL "
             "connection string; API routes will answer 503 until then."
         )
-        return 0
+        return bundled_word_count()
 
     conn = open_connection()
     try:

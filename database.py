@@ -339,6 +339,26 @@ def like_operator() -> str:
     return "ILIKE" if IS_POSTGRES else "LIKE"
 
 
+def bundled_word_count() -> int:
+    """Word count of the bundled read-only archive.
+
+    Used for metadata when no database is configured, so `/api/site` keeps
+    reporting the archive size instead of zero.
+    """
+    if not os.path.exists(BUNDLED_DB):
+        return 0
+    try:
+        conn = sqlite3.connect(f"file:{BUNDLED_DB}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return 0
+    try:
+        return int(conn.execute("SELECT COUNT(*) FROM words").fetchone()[0])
+    except (sqlite3.Error, TypeError):
+        return 0
+    finally:
+        conn.close()
+
+
 def iso(value: datetime | None = None) -> str:
     return (value or datetime.now(timezone.utc)).replace(microsecond=0).isoformat()
 
