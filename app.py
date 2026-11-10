@@ -40,7 +40,7 @@ try:
         restrict_permissions,
         set_content_version,
     )
-    from seed import CONTENT_VERSION, seed, sync_content
+    from seed import CONTENT_VERSION, WORDS, seed, sync_content
     from materials import HSK_MATERIAL
     from security import init_security
     from webfront import init_site
@@ -70,7 +70,7 @@ except ImportError:  # pragma: no cover - package import
         restrict_permissions,
         set_content_version,
     )
-    from .seed import CONTENT_VERSION, seed, sync_content
+    from .seed import CONTENT_VERSION, WORDS, seed, sync_content
     from .materials import HSK_MATERIAL
     from .security import init_security
     from .webfront import init_site
@@ -167,7 +167,9 @@ def init_db() -> int:
             "No durable database configured. Set DATABASE_URL to a PostgreSQL "
             "connection string; API routes will answer 503 until then."
         )
-        return bundled_word_count()
+        # A Git deployment does not carry the gitignored instance database, so
+        # fall back to the source vocabulary instead of reporting zero words.
+        return max(bundled_word_count(), len(WORDS))
 
     conn = open_connection()
     acquire_startup_lock(conn)
