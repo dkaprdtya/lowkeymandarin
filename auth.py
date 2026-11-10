@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database import get_db, iso, parse_dt
+from database import database_ready, get_db, iso, parse_dt
 from mailer import public_base, reset_configured, send_password_reset
 from security import RateLimiter
 
@@ -253,8 +253,13 @@ def init_auth(app: Flask) -> None:
     def _load_identity():
         if request.path.startswith("/static/"):
             return None
-        db = get_db()
-        _load_session(db)
+        if database_ready():
+            db = get_db()
+            _load_session(db)
+        else:
+            # The shell still renders; API routes answer 503 on their own.
+            g.auth_session = None
+            g.user = None
 
         cookie = request.cookies.get(CSRF_COOKIE) or ""
         g.csrf_cookie = cookie or secrets.token_urlsafe(32)
@@ -316,26 +321,30 @@ def init_auth(app: Flask) -> None:
             return jsonify({"error": "An account with that email already exists."}), 409
 
         now = iso()
-        try:
-            cur = db.execute(
-                """INSERT INTO users
-                   (email, password_hash, display_name, created_at, updated_at, settings)
-                   VALUES (?,?,?,?,?,?)""",
-                (
-                    email,
-                    generate_password_hash(password),
-                    _clean_name(data.get("displayName"), email),
-                    now,
-                    now,
-                    json.dumps({"pace": "hsk", "hskLevel": 1}),
-                ),
-            )
-        except sqlite3.IntegrityError:
+        cur = db.execute(
+            """INSERT INTO users
+               (email, password_hash, display_name, created_at, updated_at, settings)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(email) DO NOTHING
+               RETURNING id""",
+            (
+                email,
+                generate_password_hash(password),
+                _clean_name(data.get("displayName"), email),
+                now,
+                now,
+                json.dumps({"pace": "hsk", "hskLevel": 1}),
+            ),
+        )
+        inserted = cur.fetchone()
+        if not inserted:
+            db.rollback()
             return jsonify({"error": "An account with that email already exists."}), 409
 
-        token, csrf = establish_session(db, int(cur.lastrowid))
+        user_id = int(inserted[0])
+        token, csrf = establish_session(db, user_id)
         db.commit()
-        row = db.execute("SELECT * FROM users WHERE id=?", (cur.lastrowid,)).fetchone()
+        row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         response = jsonify({"user": public_user(row)})
         response.status_code = 201
         _set_session_cookie(response, token)
@@ -538,7 +547,7 @@ def account_stats(db, user_id: int) -> dict:
     row = db.execute(
         """SELECT COUNT(*) AS tracked,
                   COALESCE(SUM(saved),0) AS saved,
-                  COALESCE(SUM(reps >= 2),0) AS retained
+                  COALESCE(SUM(CASE WHEN reps >= 2 THEN 1 ELSE 0 END),0) AS retained
            FROM progress WHERE user_id=?""",
         (user_id,),
     ).fetchone()

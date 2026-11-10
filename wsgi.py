@@ -16,27 +16,13 @@ client can spoof those headers.
 """
 from __future__ import annotations
 
-import os
-
 try:
     from app import app
 except ImportError:  # pragma: no cover - package import
     from .app import app
 
-_TRUST_PROXY = (os.environ.get("HANZI_TRUST_PROXY") or "").strip().lower()
-if _TRUST_PROXY in {"1", "true", "yes", "on"}:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=1,
-        x_proto=1,
-        x_host=1,
-        x_port=1,
-    )
-    app.logger.warning(
-        "HANZI_TRUST_PROXY is on: keep the app bound to loopback behind the proxy."
-    )
+# Proxy header handling lives in app.py so the Vercel entry point gets it too.
+# Set HANZI_TRUST_PROXY=1 when this module runs behind nginx or Caddy.
 
 __all__ = ["app"]
 

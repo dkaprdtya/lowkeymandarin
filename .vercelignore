@@ -1,0 +1,19 @@
+# Uploaded to Vercel as-is. Keep instance/hanzi.db: database.py copies it to
+# /tmp on the first cold start, which skips the slower seed.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+backups/
+*.zip
+*.sha256
+*.db-wal
+*.db-shm
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+Thumbs.db

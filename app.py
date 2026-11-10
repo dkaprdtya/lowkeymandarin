@@ -23,8 +23,21 @@ try:
         public_user,
         require_user,
     )
-    from database import DB_PATH, close_db, get_db, iso, parse_dt, prepare_schema, restrict_permissions
-    from seed import seed, sync_content
+    from database import (
+        DatabaseNotConfigured,
+        close_db,
+        content_version,
+        database_ready,
+        get_db,
+        iso,
+        like_operator,
+        open_connection,
+        parse_dt,
+        prepare_schema,
+        restrict_permissions,
+        set_content_version,
+    )
+    from seed import CONTENT_VERSION, seed, sync_content
     from materials import HSK_MATERIAL
     from security import init_security
     from webfront import init_site
@@ -38,15 +51,20 @@ except ImportError:  # pragma: no cover - package import
         require_user,
     )
     from .database import (
-        DB_PATH,
+        DatabaseNotConfigured,
         close_db,
+        content_version,
+        database_ready,
         get_db,
         iso,
+        like_operator,
+        open_connection,
         parse_dt,
         prepare_schema,
         restrict_permissions,
+        set_content_version,
     )
-    from .seed import seed, sync_content
+    from .seed import CONTENT_VERSION, seed, sync_content
     from .materials import HSK_MATERIAL
     from .security import init_security
     from .webfront import init_site
@@ -81,10 +99,33 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 app.json.ensure_ascii = False
 app.config["HANZI_CONTACT_EMAIL"] = (os.environ.get("HANZI_CONTACT_EMAIL") or "").strip()
 
+
+def _proxy_fix_enabled() -> bool:
+    forced = (os.environ.get("HANZI_TRUST_PROXY") or "").strip().lower()
+    if forced in {"1", "true", "yes", "on"}:
+        return True
+    if forced in {"0", "false", "no", "off"}:
+        return False
+    # Vercel terminates TLS and sets X-Forwarded-For at the edge. Without this,
+    # every client shares the proxy address and one rate-limit bucket.
+    return bool(os.environ.get("VERCEL"))
+
+
+if _proxy_fix_enabled():
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+
 init_security(app)
 init_auth(app)
 init_site(app)
 app.teardown_appcontext(close_db)
+
+
+@app.errorhandler(DatabaseNotConfigured)
+def _database_not_configured(_error):
+    # Deliberately generic: connection strings and driver errors stay in logs.
+    return jsonify({"error": "The archive database is not connected yet."}), 503
 
 
 def safe_int(value, default: int, low: int | None = None, high: int | None = None) -> int:
@@ -109,28 +150,41 @@ def safe_float(value, default: float = 0.0) -> float:
 # --------------------------------------------------------------------------- #
 # Database initialisation
 # --------------------------------------------------------------------------- #
-def init_db() -> None:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    fresh = not os.path.exists(DB_PATH)
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA journal_mode = WAL")
-    migrated = prepare_schema(conn)
-    count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
-    if count == 0:
-        seed(conn)
-    sync_content(conn)
-    conn.commit()
-    conn.close()
+def init_db() -> int:
+    """Create or migrate storage, then return the shared word count.
+
+    Runs once per process. With PostgreSQL the schema and seed are idempotent,
+    so a cold serverless instance only pays for a count query.
+    """
+    if not database_ready():
+        app.logger.error(
+            "No durable database configured. Set DATABASE_URL to a PostgreSQL "
+            "connection string; API routes will answer 503 until then."
+        )
+        return 0
+
+    conn = open_connection()
+    try:
+        migrated = prepare_schema(conn)
+        count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
+        stored_version = content_version(conn)
+        if count == 0:
+            seed(conn)
+        elif stored_version != CONTENT_VERSION:
+            sync_content(conn)
+        if stored_version != CONTENT_VERSION:
+            set_content_version(conn, CONTENT_VERSION)
+        conn.commit()
+        count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
+    finally:
+        conn.close()
+
     restrict_permissions()
-    if fresh:
-        app.logger.info("Lowkey Mandarin database created at %s", DB_PATH)
     if migrated:
         app.logger.warning(
             "Legacy single-profile learner data was removed. Shared vocabulary was kept."
         )
+    return count
 
 
 HSK_TITLES = {
@@ -439,8 +493,9 @@ def words():
     sql = "SELECT * FROM words"
     params: list = []
     clauses = []
+    like = like_operator()
     if q:
-        clauses.append("(hanzi LIKE ? OR pinyin LIKE ? OR meaning LIKE ?)")
+        clauses.append(f"(hanzi {like} ? OR pinyin {like} ? OR meaning {like} ?)")
         params += [f"%{q}%", f"%{q}%", f"%{q}%"]
     if category and category != "all":
         clauses.append("category = ?")
@@ -867,7 +922,8 @@ def lab_detail(char: str):
         return jsonify({"error": "character not in the lab yet"}), 404
     pmap = progress_map(db, current_user_id())
     related = db.execute(
-        "SELECT * FROM words WHERE hanzi LIKE ? ORDER BY id LIMIT 8", (f"%{char}%",)
+        "SELECT * FROM words WHERE hanzi " + like_operator() + " ? ORDER BY id LIMIT 8",
+        (f"%{char}%",),
     ).fetchall()
     return jsonify({
         "char": meta["char"], "pinyin": meta["pinyin"], "meaning": meta["meaning"],
@@ -1138,21 +1194,27 @@ def export_data():
 
 @app.route("/api/health")
 def health():
-    return jsonify({"ok": True, "words": get_db().execute("SELECT COUNT(*) FROM words").fetchone()[0]})
-
-
-init_db()
-
-
-def word_count() -> int:
-    connection = sqlite3.connect(DB_PATH)
+    if not database_ready():
+        return jsonify({
+            "ok": False,
+            "stage": "config",
+            "error": "DatabaseNotConfigured",
+            "hint": "DATABASE_URL is not set for this deployment; add it and redeploy",
+        }), 503
     try:
-        return connection.execute("SELECT COUNT(*) FROM words").fetchone()[0]
-    finally:
-        connection.close()
+        count = get_db().execute("SELECT COUNT(*) FROM words").fetchone()[0]
+    except Exception:
+        app.logger.exception("Database health check failed")
+        return jsonify({
+            "ok": False,
+            "stage": "database",
+            "error": "DatabaseUnavailable",
+            "hint": "The configured database could not be reached.",
+        }), 503
+    return jsonify({"ok": True, "words": count})
 
 
-app.config["HANZI_WORD_COUNT"] = word_count()
+app.config["HANZI_WORD_COUNT"] = init_db()
 
 
 if __name__ == "__main__":

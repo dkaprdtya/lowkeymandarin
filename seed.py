@@ -742,85 +742,111 @@ CHAR_META = [
 ]
 
 
+# Bump when the shared content changes so an existing deployment refreshes it
+# once instead of on every cold start.
+CONTENT_VERSION = "2026-11-11.1"
+
+WORD_COLUMNS = """(hanzi, pinyin, meaning, category, hsk, radical, strokes, components,
+                   example, example_pinyin, example_en, note)"""
+
+WORDS_UPSERT = f"""INSERT INTO words {WORD_COLUMNS}
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(hanzi) DO NOTHING"""
+
+RELATIONS_INSERT = """INSERT INTO relations (source_id, target_id, type, note, strength)
+                      VALUES (?,?,?,?,?)
+                      ON CONFLICT(source_id, target_id, type) DO NOTHING"""
+
+CHAR_META_UPSERT = """INSERT INTO char_meta
+                      (char, pinyin, meaning, radical, strokes, structure, components, origin, hint)
+                      VALUES (?,?,?,?,?,?,?,?,?)
+                      ON CONFLICT(char) DO UPDATE SET
+                        pinyin=excluded.pinyin, meaning=excluded.meaning,
+                        radical=excluded.radical, strokes=excluded.strokes,
+                        structure=excluded.structure, components=excluded.components,
+                        origin=excluded.origin, hint=excluded.hint"""
+
+SCENARIOS_UPSERT = """INSERT INTO scenarios
+                      (slug, title, hanzi, setting, description, level, accent, dialogue, choices, phrases)
+                      VALUES (?,?,?,?,?,?,?,?,?,?)
+                      ON CONFLICT(slug) DO UPDATE SET
+                        title=excluded.title, hanzi=excluded.hanzi, setting=excluded.setting,
+                        description=excluded.description, level=excluded.level,
+                        accent=excluded.accent, dialogue=excluded.dialogue,
+                        choices=excluded.choices, phrases=excluded.phrases"""
+
+SOUND_SETS_UPSERT = """INSERT INTO sound_sets (slug, title, kind, description, items)
+                       VALUES (?,?,?,?,?)
+                       ON CONFLICT(slug) DO UPDATE SET
+                         title=excluded.title, kind=excluded.kind,
+                         description=excluded.description, items=excluded.items"""
+
+
+def _word_ids(conn) -> dict[str, int]:
+    return {
+        row[0]: row[1]
+        for row in conn.execute("SELECT hanzi, id FROM words").fetchall()
+    }
+
+
+def _relation_rows(ids: dict[str, int]) -> list[tuple]:
+    """Every relation in both directions, de-duplicated by the unique index."""
+    by_hanzi = {w[0]: w for w in WORDS}
+    rows: list[tuple] = []
+    for a, b, rtype, note, strength in RELATIONS:
+        if a not in ids or b not in ids or a == b:
+            continue
+        rows.append((ids[a], ids[b], rtype, note, strength))
+        rows.append((ids[b], ids[a], rtype, note, strength))
+
+    # Derived component edges: only when the component is itself a word.
+    for hanzi, wid in ids.items():
+        meta = by_hanzi.get(hanzi)
+        if not meta:
+            continue
+        for comp in meta[7].split():
+            if comp in ids and comp != hanzi:
+                rows.append((wid, ids[comp], "component",
+                             f"{hanzi} contains the character {comp}.", 4))
+                rows.append((ids[comp], wid, "component",
+                             f"{comp} is a component of {hanzi}.", 4))
+    return rows
+
+
+def _scenario_rows() -> list[tuple]:
+    return [
+        (s["slug"], s["title"], s["hanzi"], s["setting"], s["description"],
+         s["level"], s["accent"], json.dumps(s["dialogue"], ensure_ascii=False),
+         json.dumps(s["choices"], ensure_ascii=False),
+         json.dumps(s["phrases"], ensure_ascii=False))
+        for s in SCENARIOS
+    ]
+
+
+def _sound_set_rows() -> list[tuple]:
+    return [
+        (s["slug"], s["title"], s["kind"], s["description"],
+         json.dumps(s["items"], ensure_ascii=False))
+        for s in SOUND_SETS
+    ]
+
+
 def seed(conn) -> None:
     """Populate the shared content of an empty database.
 
     Accounts and learner progress are intentionally not seeded. Every visitor
     starts with an empty archive after registering.
+
+    Bulk inserts keep a first-run seed to a handful of round trips, which
+    matters when the database is a hosted PostgreSQL instance.
     """
-    ids: dict[str, int] = {}
-    for w in WORDS:
-        cur = conn.execute(
-            """INSERT INTO words
-               (hanzi, pinyin, meaning, category, hsk, radical, strokes, components,
-                example, example_pinyin, example_en, note)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            w,
-        )
-        ids[w[0]] = cur.lastrowid
+    conn.executemany(WORDS_UPSERT, WORDS)
+    ids = _word_ids(conn)
 
-    # Manual relations
-    for a, b, rtype, note, strength in RELATIONS:
-        if a not in ids or b not in ids or a == b:
-            continue
-        conn.execute(
-            """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-               VALUES (?,?,?,?,?)""",
-            (ids[a], ids[b], rtype, note, strength),
-        )
-        conn.execute(
-            """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-               VALUES (?,?,?,?,?)""",
-            (ids[b], ids[a], rtype, note, strength),
-        )
-
-    # Derived component edges: only when the component is itself a word.
-    for hanzi, wid in ids.items():
-        meta = next((w for w in WORDS if w[0] == hanzi), None)
-        if not meta:
-            continue
-        for comp in meta[7].split():
-            if comp in ids and comp != hanzi:
-                conn.execute(
-                    """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-                       VALUES (?,?,?,?,?)""",
-                    (wid, ids[comp], "component",
-                     f"{hanzi} contains the character {comp}.", 4),
-                )
-                conn.execute(
-                    """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-                       VALUES (?,?,?,?,?)""",
-                    (ids[comp], wid, "component",
-                     f"{comp} is a component of {hanzi}.", 4),
-                )
-
-    # Character laboratory metadata
-    for row in CHAR_META:
-        conn.execute(
-            """INSERT OR REPLACE INTO char_meta
-               (char, pinyin, meaning, radical, strokes, structure, components, origin, hint)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
-            row,
-        )
-
-    for s in SCENARIOS:
-        conn.execute(
-            """INSERT INTO scenarios
-               (slug, title, hanzi, setting, description, level, accent, dialogue, choices, phrases)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (s["slug"], s["title"], s["hanzi"], s["setting"], s["description"],
-             s["level"], s["accent"], json.dumps(s["dialogue"], ensure_ascii=False),
-             json.dumps(s["choices"], ensure_ascii=False),
-             json.dumps(s["phrases"], ensure_ascii=False)),
-        )
-
-    for s in SOUND_SETS:
-        conn.execute(
-            "INSERT INTO sound_sets (slug, title, kind, description, items) VALUES (?,?,?,?,?)",
-            (s["slug"], s["title"], s["kind"], s["description"],
-             json.dumps(s["items"], ensure_ascii=False)),
-        )
-
+    conn.executemany(RELATIONS_INSERT, _relation_rows(ids))
+    conn.executemany(CHAR_META_UPSERT, CHAR_META)
+    conn.executemany(SCENARIOS_UPSERT, _scenario_rows())
+    conn.executemany(SOUND_SETS_UPSERT, _sound_set_rows())
     conn.commit()
 
 
@@ -830,43 +856,30 @@ def sync_content(conn) -> int:
     Idempotent: existing rows keep their ids, progress and discoveries. Only
     missing vocabulary and edges are inserted. Returns the number of new words.
     """
-    existing = {
-        row[0]: row[1]
-        for row in conn.execute("SELECT hanzi, id FROM words").fetchall()
-    }
-    added = 0
+    existing = _word_ids(conn)
+    updates = []
+    inserts = []
     for w in WORDS:
         if w[0] in existing:
-            conn.execute(
-                """UPDATE words SET pinyin=?, meaning=?, category=?, hsk=?,
-                   example=?, example_pinyin=?, example_en=?, note=?
-                   WHERE id=?""",
-                (w[1], w[2], w[3], w[4], w[8], w[9], w[10], w[11], existing[w[0]]),
-            )
+            updates.append((w[1], w[2], w[3], w[4], w[8], w[9], w[10], w[11],
+                            existing[w[0]]))
             continue
-        cur = conn.execute(
-            """INSERT INTO words
-               (hanzi, pinyin, meaning, category, hsk, radical, strokes, components,
-                example, example_pinyin, example_en, note)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            w,
-        )
-        existing[w[0]] = cur.lastrowid
-        added += 1
+        inserts.append(w)
 
-    for a, b, rtype, note, strength in RELATIONS:
-        if a not in existing or b not in existing or a == b:
-            continue
-        conn.execute(
-            """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-               VALUES (?,?,?,?,?)""",
-            (existing[a], existing[b], rtype, note, strength),
+    if updates:
+        conn.executemany(
+            """UPDATE words SET pinyin=?, meaning=?, category=?, hsk=?,
+               example=?, example_pinyin=?, example_en=?, note=?
+               WHERE id=?""",
+            updates,
         )
-        conn.execute(
-            """INSERT OR IGNORE INTO relations (source_id, target_id, type, note, strength)
-               VALUES (?,?,?,?,?)""",
-            (existing[b], existing[a], rtype, note, strength),
-        )
+    if inserts:
+        conn.executemany(WORDS_UPSERT, inserts)
+        existing = _word_ids(conn)
 
+    conn.executemany(RELATIONS_INSERT, _relation_rows(existing))
+    conn.executemany(CHAR_META_UPSERT, CHAR_META)
+    conn.executemany(SCENARIOS_UPSERT, _scenario_rows())
+    conn.executemany(SOUND_SETS_UPSERT, _sound_set_rows())
     conn.commit()
-    return added
+    return len(inserts)

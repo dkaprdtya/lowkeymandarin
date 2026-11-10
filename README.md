@@ -107,7 +107,9 @@ hanzi-flow/
 | --- | --- |
 | `PORT` | HTTP port for `python app.py` (default `5000`) |
 | `FLASK_DEBUG` | Set to `1` for Flask debug mode; never in production |
-| `HANZI_DB` | Absolute path to the SQLite database |
+| `DATABASE_URL` | PostgreSQL connection string; when set, PostgreSQL replaces SQLite |
+| `HANZI_DB` | Absolute path to the SQLite database (ignored when `DATABASE_URL` is set) |
+| `HANZI_ALLOW_EPHEMERAL` | `1` allows throwaway `/tmp` SQLite on a serverless host |
 | `HANZI_CONTACT_EMAIL` | Contact address shown on the contact page |
 | `HANZI_PUBLIC_URL` | Public origin used in password-reset links |
 | `HANZI_COOKIE_SECURE` | `1` forces Secure cookies behind an HTTPS proxy |
@@ -177,11 +179,36 @@ python -m waitress --listen=127.0.0.1:5000 --threads=4 --no-clear-untrusted-prox
 
 Waitress 3 removes `X-Forwarded-*` headers unless told otherwise. The
 `--no-clear-untrusted-proxy-headers` flag keeps them so `HANZI_TRUST_PROXY=1`
-can apply them in `wsgi.py`. Without that variable the app ignores them.
+can apply them. Without that variable (or `VERCEL=1`) the app ignores them.
 
 The app seeds the database on first start. Set `HANZI_DB` to a persistent,
-writable path before the first run. `instance/hanzi.db` is the default for local
-development only.
+writable path before the first run, or set `DATABASE_URL` to use PostgreSQL.
+`instance/hanzi.db` is the default for local development only.
+
+### Deploy on Vercel with PostgreSQL
+
+Vercel's filesystem is read-only and per-instance, so SQLite cannot hold
+accounts there. The app uses PostgreSQL when `DATABASE_URL` is set, and creates
+and seeds its schema on the first request.
+
+1. Create a PostgreSQL database (Neon, Supabase, RDS). Copy the pooled
+   connection string that ends with `?sslmode=require`.
+2. In the Vercel project, add environment variables for Production and Preview:
+   - `DATABASE_URL` - the connection string
+   - `HANZI_COOKIE_SECURE=1`
+   - `HANZI_PUBLIC_URL=https://your-domain`
+   - `HANZI_TRUSTED_HOSTS=your-domain` (optional; the public URL host is added
+     automatically)
+3. Redeploy. `VERCEL=1` is set by the platform, so forwarded headers and
+   HTTPS-only cookies are handled without extra configuration.
+4. Check `https://your-domain/api/health`. It must return
+   `{"ok": true, "words": 2594}`.
+
+Never commit the connection string. Rotate the database password if it has been
+shared, and enable the provider's backups or point-in-time recovery.
+
+A Vercel deployment without `DATABASE_URL` answers 503 on API routes by design;
+it does not silently write accounts to storage that disappears.
 
 ### Test a host with Docker
 

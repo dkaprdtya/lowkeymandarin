@@ -159,3 +159,11 @@ CREATE INDEX IF NOT EXISTS idx_progress_due ON progress(user_id, due);
 CREATE INDEX IF NOT EXISTS idx_discoveries_user ON discoveries(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, ended_at);
 CREATE INDEX IF NOT EXISTS idx_challenge_user ON challenge_results(user_id, game);
+
+-- ---------------------------------------------------------------------------
+-- Bookkeeping
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_meta (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
