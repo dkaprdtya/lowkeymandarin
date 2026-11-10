@@ -25,6 +25,7 @@ try:
     )
     from database import (
         DatabaseNotConfigured,
+        acquire_startup_lock,
         bundled_word_count,
         close_db,
         content_version,
@@ -35,6 +36,7 @@ try:
         open_connection,
         parse_dt,
         prepare_schema,
+        release_startup_lock,
         restrict_permissions,
         set_content_version,
     )
@@ -53,6 +55,7 @@ except ImportError:  # pragma: no cover - package import
     )
     from .database import (
         DatabaseNotConfigured,
+        acquire_startup_lock,
         bundled_word_count,
         close_db,
         content_version,
@@ -63,6 +66,7 @@ except ImportError:  # pragma: no cover - package import
         open_connection,
         parse_dt,
         prepare_schema,
+        release_startup_lock,
         restrict_permissions,
         set_content_version,
     )
@@ -166,6 +170,7 @@ def init_db() -> int:
         return bundled_word_count()
 
     conn = open_connection()
+    acquire_startup_lock(conn)
     try:
         migrated = prepare_schema(conn)
         count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
@@ -179,6 +184,10 @@ def init_db() -> int:
         conn.commit()
         count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
     finally:
+        try:
+            release_startup_lock(conn)
+        except Exception:
+            app.logger.exception("Could not release the database startup lock")
         conn.close()
 
     restrict_permissions()

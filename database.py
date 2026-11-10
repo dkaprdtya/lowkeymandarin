@@ -339,6 +339,21 @@ def like_operator() -> str:
     return "ILIKE" if IS_POSTGRES else "LIKE"
 
 
+# Serialises first-run schema creation and seeding when several serverless
+# instances start at once. The value is arbitrary but must stay stable.
+STARTUP_LOCK_KEY = 0x4C4F574B4559  # "LOWKEY"
+
+
+def acquire_startup_lock(conn) -> None:
+    if IS_POSTGRES:
+        conn.execute("SELECT pg_advisory_lock(?)", (STARTUP_LOCK_KEY,))
+
+
+def release_startup_lock(conn) -> None:
+    if IS_POSTGRES:
+        conn.execute("SELECT pg_advisory_unlock(?)", (STARTUP_LOCK_KEY,))
+
+
 def bundled_word_count() -> int:
     """Word count of the bundled read-only archive.
 
