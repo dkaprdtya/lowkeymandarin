@@ -1214,6 +1214,8 @@ def export_data():
 @app.route("/api/health")
 def health():
     if not database_ready():
+        present = {key: ("set" if (os.environ.get(key) or "").strip() else "empty")
+                   for key in DATABASE_URL_KEYS if key in os.environ}
         return jsonify({
             "ok": False,
             "stage": "config",
@@ -1224,6 +1226,7 @@ def health():
                 "POSTGRES_URL, then redeploy."
             ),
             "acceptedEnv": list(DATABASE_URL_KEYS),
+            "presentEnv": present,
         }), 503
     try:
         count = get_db().execute("SELECT COUNT(*) FROM words").fetchone()[0]
