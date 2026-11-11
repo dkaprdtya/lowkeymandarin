@@ -25,6 +25,9 @@ try:
     )
     from database import (
         DatabaseNotConfigured,
+        DATABASE_URL_KEYS,
+        DATABASE_URL_SOURCE,
+        IS_POSTGRES,
         acquire_startup_lock,
         bundled_word_count,
         close_db,
@@ -55,6 +58,9 @@ except ImportError:  # pragma: no cover - package import
     )
     from .database import (
         DatabaseNotConfigured,
+        DATABASE_URL_KEYS,
+        DATABASE_URL_SOURCE,
+        IS_POSTGRES,
         acquire_startup_lock,
         bundled_word_count,
         close_db,
@@ -1212,7 +1218,12 @@ def health():
             "ok": False,
             "stage": "config",
             "error": "DatabaseNotConfigured",
-            "hint": "DATABASE_URL is not set for this deployment; add it and redeploy",
+            "hint": (
+                "No PostgreSQL connection string is visible to this deployment. "
+                "Add DATABASE_URL, or attach a Postgres integration that sets "
+                "POSTGRES_URL, then redeploy."
+            ),
+            "acceptedEnv": list(DATABASE_URL_KEYS),
         }), 503
     try:
         count = get_db().execute("SELECT COUNT(*) FROM words").fetchone()[0]
@@ -1224,7 +1235,12 @@ def health():
             "error": "DatabaseUnavailable",
             "hint": "The configured database could not be reached.",
         }), 503
-    return jsonify({"ok": True, "words": count})
+    return jsonify({
+        "ok": True,
+        "words": count,
+        "engine": "postgresql" if IS_POSTGRES else "sqlite",
+        "env": DATABASE_URL_SOURCE or "HANZI_DB",
+    })
 
 
 app.config["HANZI_WORD_COUNT"] = init_db()

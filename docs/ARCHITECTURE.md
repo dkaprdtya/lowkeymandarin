@@ -27,6 +27,9 @@ Storage
   PostgreSQL
     DATABASE_URL                used instead of SQLite when set (required on
                                 serverless hosts such as Vercel)
+    POSTGRES_URL                accepted alias written by the Vercel/Neon
+    POSTGRES_PRISMA_URL         integrations; the first one present wins
+    DATABASE_URL_UNPOOLED
 ```
 
 `wsgi.py` imports the Flask app. `app.py` applies `ProxyFix` when

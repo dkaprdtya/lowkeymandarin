@@ -33,10 +33,33 @@ _ALLOW_EPHEMERAL = (os.environ.get("HANZI_ALLOW_EPHEMERAL") or "").strip().lower
     "1", "true", "yes", "on",
 }
 
-DATABASE_URL = (os.environ.get("DATABASE_URL") or "").strip()
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
-IS_POSTGRES = DATABASE_URL.startswith("postgresql://")
+# Hosting panels name the connection string differently. A hand-set variable is
+# usually ``DATABASE_URL``; the Vercel/Neon integrations write ``POSTGRES_URL``
+# and friends. Accept all of them so attaching a database needs no code change.
+DATABASE_URL_KEYS = (
+    "DATABASE_URL",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "DATABASE_URL_UNPOOLED",
+)
+
+
+def _read_database_url() -> tuple[str, str]:
+    """Return ``(env_name, url)`` for the first usable connection string."""
+    for key in DATABASE_URL_KEYS:
+        raw = (os.environ.get(key) or "").strip().strip('"').strip("'").strip()
+        if not raw:
+            continue
+        if raw.startswith("postgres://"):
+            raw = "postgresql://" + raw[len("postgres://"):]
+        if raw.startswith("postgresql://"):
+            return key, raw
+    return "", ""
+
+
+DATABASE_URL_SOURCE, DATABASE_URL = _read_database_url()
+IS_POSTGRES = bool(DATABASE_URL)
 
 DB_PATH = os.path.abspath(
     os.environ.get("HANZI_DB")
