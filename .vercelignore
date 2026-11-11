@@ -1,5 +1,5 @@
-# Uploaded to Vercel as-is. Keep instance/hanzi.db: database.py copies it to
-# /tmp on the first cold start, which skips the slower seed.
+# Uploaded to Vercel as-is. Keep instance/hanzi.db: without a PostgreSQL URL
+# database.py serves it read-only, so browsing works on a cold deployment.
 __pycache__/
 *.py[cod]
 .venv/

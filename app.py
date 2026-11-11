@@ -28,6 +28,7 @@ try:
         DATABASE_URL_KEYS,
         DATABASE_URL_SOURCE,
         IS_POSTGRES,
+        ReadOnlyArchive,
         acquire_startup_lock,
         bundled_word_count,
         close_db,
@@ -39,6 +40,7 @@ try:
         open_connection,
         parse_dt,
         prepare_schema,
+        read_only_fallback,
         release_startup_lock,
         restrict_permissions,
         set_content_version,
@@ -61,6 +63,7 @@ except ImportError:  # pragma: no cover - package import
         DATABASE_URL_KEYS,
         DATABASE_URL_SOURCE,
         IS_POSTGRES,
+        ReadOnlyArchive,
         acquire_startup_lock,
         bundled_word_count,
         close_db,
@@ -72,6 +75,7 @@ except ImportError:  # pragma: no cover - package import
         open_connection,
         parse_dt,
         prepare_schema,
+        read_only_fallback,
         release_startup_lock,
         restrict_permissions,
         set_content_version,
@@ -140,6 +144,17 @@ def _database_not_configured(_error):
     return jsonify({"error": "The archive database is not connected yet."}), 503
 
 
+@app.errorhandler(ReadOnlyArchive)
+def _read_only_archive(_error):
+    return jsonify({
+        "error": (
+            "This deployment serves the archive read-only, so accounts and "
+            "saved progress are paused until the database is connected."
+        ),
+        "readOnly": True,
+    }), 503
+
+
 def safe_int(value, default: int, low: int | None = None, high: int | None = None) -> int:
     try:
         number = int(value)
@@ -169,6 +184,13 @@ def init_db() -> int:
     so a cold serverless instance only pays for a count query.
     """
     if not database_ready():
+        if read_only_fallback():
+            # Content ships with the deployment: serve it read-only so the site
+            # stays usable while the operator attaches a PostgreSQL database.
+            app.logger.info(
+                "Serving the bundled archive read-only. Accounts need DATABASE_URL."
+            )
+            return bundled_word_count()
         app.logger.error(
             "No durable database configured. Set DATABASE_URL to a PostgreSQL "
             "connection string; API routes will answer 503 until then."
@@ -1213,7 +1235,7 @@ def export_data():
 
 @app.route("/api/health")
 def health():
-    if not database_ready():
+    if not database_ready() and not read_only_fallback():
         present = {key: ("set" if (os.environ.get(key) or "").strip() else "empty")
                    for key in DATABASE_URL_KEYS if key in os.environ}
         return jsonify({
@@ -1238,12 +1260,20 @@ def health():
             "error": "DatabaseUnavailable",
             "hint": "The configured database could not be reached.",
         }), 503
-    return jsonify({
+    payload = {
         "ok": True,
         "words": count,
         "engine": "postgresql" if IS_POSTGRES else "sqlite",
         "env": DATABASE_URL_SOURCE or "HANZI_DB",
-    })
+    }
+    if not database_ready():
+        payload["env"] = "bundled"
+        payload["readOnly"] = True
+        payload["hint"] = (
+            "Reading content from the bundled archive. Accounts and saved "
+            "progress need DATABASE_URL."
+        )
+    return jsonify(payload)
 
 
 app.config["HANZI_WORD_COUNT"] = init_db()

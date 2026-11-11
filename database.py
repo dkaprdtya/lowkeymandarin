@@ -12,6 +12,7 @@ results belong to one account and are removed with that account.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sqlite3
 from datetime import datetime, timezone
@@ -86,6 +87,64 @@ if _pg_errors is not None:
 
 class DatabaseNotConfigured(RuntimeError):
     """Raised when a serverless deployment has no durable database."""
+
+
+class ReadOnlyArchive(DatabaseNotConfigured):
+    """Raised when a write reaches the bundled, read-only archive."""
+
+
+# A deployment can ship the content database without a writable volume. Reads
+# then come straight from the bundled file and every write is refused, so the
+# site stays browsable while accounts wait for a real PostgreSQL URL.
+_READ_ONLY_FALLBACK = (
+    _SERVERLESS
+    and not IS_POSTGRES
+    and not _ALLOW_EPHEMERAL
+    and os.path.exists(BUNDLED_DB)
+)
+
+_WRITE_SQL = re.compile(
+    r"^\s*(?:insert|update|delete|replace|create|drop|alter|vacuum|attach|detach|reindex)\b",
+    re.IGNORECASE,
+)
+
+
+def read_only_fallback() -> bool:
+    """True when the bundled archive is served without accepting writes."""
+    return _READ_ONLY_FALLBACK
+
+
+class _BundledConnection(sqlite3.Connection):
+    """SQLite connection that answers reads and refuses every write."""
+
+    def _guard(self, sql) -> None:
+        if isinstance(sql, str) and _WRITE_SQL.match(sql):
+            raise ReadOnlyArchive(
+                "This deployment serves the bundled archive read-only. Set "
+                "DATABASE_URL to save accounts and progress."
+            )
+
+    def execute(self, sql, parameters=(), /):
+        self._guard(sql)
+        return super().execute(sql, parameters)
+
+    def executemany(self, sql, seq_of_parameters, /):
+        self._guard(sql)
+        return super().executemany(sql, seq_of_parameters)
+
+    def executescript(self, sql_script, /):
+        self._guard(sql_script)
+        return super().executescript(sql_script)
+
+
+def _open_bundled_readonly() -> sqlite3.Connection:
+    uri = "file:{}?mode=ro&immutable=1".format(BUNDLED_DB.replace("\\", "/"))
+    conn = sqlite3.connect(
+        uri, uri=True, timeout=10, factory=_BundledConnection
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
 
 
 def database_ready() -> bool:
@@ -257,6 +316,8 @@ def open_connection():
     """Open a connection outside a request, for startup and maintenance."""
     if IS_POSTGRES:
         return PgConnection(_connect_pg())
+    if _READ_ONLY_FALLBACK:
+        return _open_bundled_readonly()
     prepare_storage()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
@@ -268,7 +329,7 @@ def open_connection():
 
 def get_db():
     if "db" not in g:
-        if not database_ready():
+        if not database_ready() and not _READ_ONLY_FALLBACK:
             raise DatabaseNotConfigured(
                 "This serverless deployment has no durable database. Set "
                 "DATABASE_URL to a PostgreSQL connection string."

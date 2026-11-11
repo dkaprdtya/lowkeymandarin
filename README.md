@@ -217,9 +217,12 @@ without renaming anything.
 Never commit the connection string. Rotate the database password if it has been
 shared, and enable the provider's backups or point-in-time recovery.
 
-A Vercel deployment with no usable connection string answers 503 on API routes
-by design; it does not silently write accounts to storage that disappears. In
-that case `/api/health` lists `acceptedEnv`, the variable names it looks for.
+A Vercel deployment with no usable connection string still serves the archive:
+the bundled content database is opened read-only, so browsing, word pages and
+the graph work while accounts, saved words and progress answer 503 with a
+`readOnly` flag. `/api/health` reports `"readOnly": true` and lists
+`acceptedEnv`, the variable names it looks for. Nothing is written to storage
+that would disappear.
 
 ### Test a host with Docker
 

@@ -1,11 +1,15 @@
 # Local runtime state
-instance/
+instance/*
 *.db
 *.db-wal
 *.db-shm
 *.sqlite
 *.sqlite3
 backups/
+# The content-only archive ships with Git deployments so Vercel can serve
+# read-only browsing before a PostgreSQL database is attached. It holds no
+# accounts and no personal data.
+!instance/hanzi.db
 
 # Secrets and local environment
 .env

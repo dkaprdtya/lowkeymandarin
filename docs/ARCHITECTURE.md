@@ -30,6 +30,10 @@ Storage
     POSTGRES_URL                accepted alias written by the Vercel/Neon
     POSTGRES_PRISMA_URL         integrations; the first one present wins
     DATABASE_URL_UNPOOLED
+  Read-only fallback
+    instance/hanzi.db           on a serverless host with no PostgreSQL URL,
+                                opened with mode=ro; every write raises
+                                ReadOnlyArchive and answers 503 with readOnly
 ```
 
 `wsgi.py` imports the Flask app. `app.py` applies `ProxyFix` when
